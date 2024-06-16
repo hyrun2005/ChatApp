@@ -1,13 +1,31 @@
 import random
-
 from flask import Flask, render_template, url_for, request, session, redirect
 from flask_socketio import SocketIO, join_room, leave_room, send
 from string import ascii_uppercase
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root@127.0.0.1/chatappdb'
 socketio = SocketIO(app)
 
+db = SQLAlchemy(app)
+
+migrate = Migrate(app, db)
+class History(db.Model):
+    id = db.Column('id', db.Integer, primary_key=True)
+    name = db.Column('name', db.String(20))
+    message = db.Column('message', db.String(500))
+    def __init__(self, name=None, message=None):
+        self.name = name
+        self.message = message
+
+
+with app.app_context():
+    db.create_all()
 rooms = {}
 
 def generate_unique_code(len):
@@ -67,6 +85,11 @@ def message(data):
         'name': session.get('name'),
         'message': data['data']
     }
+
+    save_msg = History(name=session.get("name"), message=data['data'])
+    db.session.add(save_msg)
+    db.session.commit()
+
     send(content, to=room)
     rooms['room']['messages'].append(content)
     print(f'{session.get("name")}: {data["data"]}')
