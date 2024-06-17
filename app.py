@@ -17,11 +17,13 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 class History(db.Model):
     id = db.Column('id', db.Integer, primary_key=True)
+    code = db.Column('code', db.String(4))
     name = db.Column('name', db.String(20))
     message = db.Column('message', db.String(500))
-    def __init__(self, name=None, message=None):
+    def __init__(self, name=None, message=None, code=None):
         self.name = name
         self.message = message
+        self.code = code
 
 
 with app.app_context():
@@ -73,7 +75,9 @@ def room():
     if room is None or session.get('name') is None or room not in rooms:
         return redirect(url_for('home'))
 
-    return render_template('room.html', code=room, messages=rooms[room]["messages"])
+    messages = History.query.filter_by(code=room).all()
+
+    return render_template('room.html', code=room, messages=messages)
 
 
 @socketio.on('message')
@@ -86,7 +90,7 @@ def message(data):
         'message': data['data']
     }
 
-    save_msg = History(name=session.get("name"), message=data['data'])
+    save_msg = History(name=session.get("name"), message=data['data'], code=session.get('room'))
     db.session.add(save_msg)
     db.session.commit()
 
